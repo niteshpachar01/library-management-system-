@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bookmark &mdash; Library Management System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<style>
+  :root{
+    --ink:#1f2a24;
+    --paper:#f6f1e6;
+    --card:#fffdf7;
+    --moss:#3c5c46;
+    --moss-dark:#28402f;
+    --brass:#a9822f;
+    --brass-light:#e4c877;
+    --line:#d8cfb8;
+    --red:#8c3a2b;
+    --shadow: 0 1px 0 rgba(31,42,36,0.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family: "Iowan Old Style","Palatino Linotype", Palatino, Georgia, serif;
+    min-height:100vh;
+  }
+  .app{max-width:1100px;margin:0 auto;padding:28px 20px 60px;}
+
+  header.masthead{
+    display:flex; align-items:baseline; justify-content:space-between;
+    border-bottom:3px double var(--moss-dark);
+    padding-bottom:14px; margin-bottom:22px;
+  }
+  header.masthead h1{
+    font-size:2.1rem; margin:0; letter-spacing:0.5px; color:var(--moss-dark); font-weight:700;
+  }
+  header.masthead h1 span{color:var(--brass);}
+  header.masthead .tagline{font-style:italic; color:#5b5346; font-size:0.95rem;}
+
+  nav.tabs{
+    display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px;
+    border-bottom:1px solid var(--line);
+  }
+  nav.tabs button{
+    font-family:inherit; font-size:0.95rem; color:var(--ink);
+    background:transparent; border:none; padding:10px 16px;
+    cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-1px;
+  }
+  nav.tabs button:hover{color:var(--moss-dark);}
+  nav.tabs button.active{
+    border-bottom:3px solid var(--brass); color:var(--moss-dark); font-weight:700;
+  }
+
+  .panel{display:none;}
+  .panel.active{display:block; animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-bottom:24px;}
+  .stat{
+    background:var(--card); border:1px solid var(--line); border-left:4px solid var(--moss);
+    padding:16px 18px; box-shadow:var(--shadow);
+  }
+  .stat .num{font-size:2rem; font-weight:700; color:var(--moss-dark); line-height:1;}
+  .stat .label{font-size:0.85rem; color:#5b5346; margin-top:6px;}
+
+  h2.section-title{
+    font-size:1.15rem; color:var(--moss-dark); border-bottom:1px solid var(--line);
+    padding-bottom:8px; margin:0 0 14px;
+  }
+
+  table{width:100%; border-collapse:collapse; background:var(--card); margin-bottom:10px;}
+  table caption{text-align:left; font-style:italic; color:#5b5346; margin-bottom:6px; font-size:0.85rem;}
+  th,td{text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); font-size:0.93rem;}
+  th{background:var(--moss); color:#fff; font-weight:600; font-size:0.82rem; text-transform:uppercase; letter-spacing:0.4px;}
+  tr:hover td{background:#faf6ea;}
+  .tablewrap{overflow-x:auto; border:1px solid var(--line);}
+
+  .toolbar{display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px; align-items:center;}
+  input,select,textarea{
+    font-family:inherit; font-size:0.93rem; padding:8px 10px; border:1px solid var(--line);
+    background:#fff; color:var(--ink);
+  }
+  textarea{width:100%; resize:vertical; font-family:"SFMono-Regular",Consolas,monospace; font-size:0.88rem;}
+  label{font-size:0.8rem; color:#5b5346; display:block; margin-bottom:3px;}
+  .field{display:flex; flex-direction:column;}
+
+  button.btn{
+    font-family:inherit; font-size:0.9rem; padding:9px 16px; border:1px solid var(--moss-dark);
+    background:var(--moss); color:#fff; cursor:pointer;
+  }
+  button.btn:hover{background:var(--moss-dark);}
+  button.btn.secondary{background:transparent; color:var(--moss-dark);}
+  button.btn.secondary:hover{background:#eee6d2;}
+  button.btn.brass{background:var(--brass); border-color:#8a6a22; color:#2c2205;}
+  button.btn.brass:hover{background:#8a6a22; color:#fff;}
+
+  .card{background:var(--card); border:1px solid var(--line); padding:20px; box-shadow:var(--shadow); margin-bottom:18px;}
+  .card h3{margin-top:0; color:var(--moss-dark); font-size:1.02rem;}
+  .formrow{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:14px;}
+
+  .msg{padding:10px 14px; margin-bottom:14px; font-size:0.9rem; border-left:4px solid var(--moss);}
+  .msg.ok{background:#eaf2ea; border-color:var(--moss); color:#20361f;}
+  .msg.err{background:#f6e6df; border-color:var(--red); color:var(--red);}
+
+  .pill{display:inline-block; padding:2px 9px; font-size:0.78rem; border-radius:2px;}
+  .pill.ok{background:#dfeee0; color:var(--moss-dark);}
+  .pill.warn{background:#f3d9c9; color:var(--red);}
+
+  .sql-echo{
+    background:var(--moss-dark); color:#e8e2cf; padding:12px 14px; font-family:monospace;
+    font-size:0.82rem; white-space:pre-wrap; margin-bottom:10px; overflow-x:auto;
+  }
+  footer{text-align:center; color:#8a8371; font-size:0.8rem; margin-top:40px; font-style:italic;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="masthead">
+    <div>
+      <h1>Book<span>mark</span></h1>
+      <div class="tagline">A relational database in your browser &mdash; Library Management System</div>
+    </div>
+    <div class="tagline" id="dbStatus">loading database&hellip;</div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="dashboard" class="active">Dashboard</button>
+    <button data-tab="catalog">Catalog</button>
+    <button data-tab="members">Members</button>
+    <button data-tab="issue">Issue / Return</button>
+    <button data-tab="reports">Reports</button>
+    <button data-tab="console">SQL Console</button>
+  </nav>
+
+  <!-- DASHBOARD -->
+  <section class="panel active" id="panel-dashboard">
+    <div class="grid" id="statGrid"></div>
+    <h2 class="section-title">Currently issued books</h2>
+    <div class="tablewrap"><table id="dashIssuedTable"></table></div>
+  </section>
+
+  <!-- CATALOG -->
+  <section class="panel" id="panel-catalog">
+    <h2 class="section-title">Book Catalog</h2>
+    <div class="toolbar">
+      <div class="field"><label>Search title / author</label><input id="catalogSearch" placeholder="e.g. Sapiens"></div>
+      <div class="field"><label>Category</label><select id="catalogCategory"><option value="">All</option></select></div>
+    </div>
+    <div class="tablewrap"><table id="catalogTable"></table></div>
+
+    <div class="card" style="margin-top:22px;">
+      <h3>Add a new book</h3>
+      <div class="formrow">
+        <div class="field"><label>Title</label><input id="newTitle"></div>
+        <div class="field"><label>ISBN</label><input id="newIsbn"></div>
+        <div class="field"><label>Author</label><input id="newAuthor" placeholder="new or existing name"></div>
+        <div class="field"><label>Category</label><input id="newCategory" placeholder="new or existing"></div>
+        <div class="field"><label>Publisher</label><input id="newPublisher"></div>
+        <div class="field"><label>Copies</label><input id="newCopies" type="number" min="1" value="1"></div>
+      </div>
+      <button class="btn" onclick="addBook()">Add Book</button>
+      <div id="addBookMsg"></div>
+    </div>
+  </section>
+
+  <!-- MEMBERS -->
+  <section class="panel" id="panel-members">
+    <h2 class="section-title">Members</h2>
+    <div class="tablewrap"><table id="membersTable"></table></div>
+    <div class="card" style="margin-top:22px;">
+      <h3>Register a new member</h3>
+      <div class="formrow">
+        <div class="field"><label>Name</label><input id="mName"></div>
+        <div class="field"><label>Email</label><input id="mEmail"></div>
+        <div class="field"><label>Phone</label><input id="mPhone"></div>
+        <div class="field"><label>Address</label><input id="mAddress"></div>
+      </div>
+      <button class="btn" onclick="addMember()">Register Member</button>
+      <div id="addMemberMsg"></div>
+    </div>
+  </section>
+
+  <!-- ISSUE / RETURN -->
+  <section class="panel" id="panel-issue">
+    <div class="card">
+      <h3>Issue a book</h3>
+      <p style="font-size:0.85rem;color:#5b5346;">Enforced by trigger: a member cannot hold more than 3 books at once.</p>
+      <div class="formrow">
+        <div class="field"><label>Book</label><select id="issueBook"></select></div>
+        <div class="field"><label>Member</label><select id="issueMember"></select></div>
+        <div class="field"><label>Loan period (days)</label><input id="issueDays" type="number" value="14" min="1"></div>
+      </div>
+      <button class="btn" onclick="issueBook()">Issue Book</button>
+      <div id="issueMsg"></div>
+    </div>
+
+    <div class="card">
+      <h3>Return a book</h3>
+      <p style="font-size:0.85rem;color:#5b5346;">Fine is auto-calculated (₹5/day late) and stock is auto-restored by a trigger.</p>
+      <div class="tablewrap"><table id="activeLoansTable"></table></div>
+    </div>
+  </section>
+
+  <!-- REPORTS -->
+  <section class="panel" id="panel-reports">
+    <h2 class="section-title">Reports</h2>
+    <div class="toolbar">
+      <button class="btn secondary" onclick="runReport('overdue')">Overdue Books</button>
+      <button class="btn secondary" onclick="runReport('popular')">Most Borrowed Books</button>
+      <button class="btn secondary" onclick="runReport('fines')">Outstanding Fines</button>
+      <button class="btn secondary" onclick="runReport('neverborrowed')">Never Borrowed</button>
+      <button class="btn secondary" onclick="runReport('activeperauthor')">Loans by Author</button>
+    </div>
+    <div class="sql-echo" id="reportSql" style="display:none;"></div>
+    <div class="tablewrap"><table id="reportTable"></table></div>
+  </section>
+
+  <!-- SQL CONSOLE -->
+  <section class="panel" id="panel-console">
+    <h2 class="section-title">SQL Console <span style="font-size:0.75rem;font-weight:normal;color:#5b5346;">(run any query against the live database)</span></h2>
+    <textarea id="sqlInput" rows="5">SELECT b.title, a.author_name, b.available_copies
+FROM Books b JOIN Authors a ON b.author_id = a.author_id
+ORDER BY b.title;</textarea>
+    <div class="toolbar" style="margin-top:10px;">
+      <button class="btn brass" onclick="runConsole()">Run Query</button>
+      <button class="btn secondary" onclick="document.getElementById('sqlInput').value=''">Clear</button>
+    </div>
+    <div id="consoleMsg"></div>
+    <div class="tablewrap"><table id="consoleTable"></table></div>
+  </section>
+
+  <footer>Bookmark LMS &middot; sample data for demonstration &middot; built on SQLite (sql.js) &mdash; no server required</footer>
+</div>
+
+<script>
+let db;
+const $ = (id) => document.getElementById(id);
+
+const SCHEMA_SQL = `
+CREATE TABLE Categories (
+  category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category_name TEXT NOT NULL UNIQUE
+);
+CREATE TABLE Authors (
+  author_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  author_name TEXT NOT NULL,
+  nationality TEXT
+);
+CREATE TABLE Books (
+  book_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  isbn TEXT UNIQUE,
+  author_id INTEGER NOT NULL REFERENCES Authors(author_id),
+  category_id INTEGER NOT NULL REFERENCES Categories(category_id),
+  publisher TEXT,
+  total_copies INTEGER NOT NULL DEFAULT 1 CHECK(total_copies >= 0),
+  available_copies INTEGER NOT NULL DEFAULT 1 CHECK(available_copies >= 0 AND available_copies <= total_copies)
+);
+CREATE TABLE Members (
+  member_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  phone TEXT,
+  address TEXT,
+  membership_date TEXT NOT NULL DEFAULT (date('now'))
+);
+CREATE TABLE Staff (
+  staff_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'Librarian',
+  email TEXT UNIQUE
+);
+CREATE TABLE BorrowRecords (
+  record_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  book_id INTEGER NOT NULL REFERENCES Books(book_id),
+  member_id INTEGER NOT NULL REFERENCES Members(member_id),
+  staff_id INTEGER REFERENCES Staff(staff_id),
+  issue_date TEXT NOT NULL DEFAULT (date('now')),
+  due_date TEXT NOT NULL,
+  return_date TEXT,
+  fine_amount REAL NOT NULL DEFAULT 0,
+  CHECK (due_date >= issue_date)
+);
+
+-- Trigger: reduce available copies when a book is issued
+CREATE TRIGGER trg_after_issue AFTER INSERT ON BorrowRecords
+BEGIN
+  UPDATE Books SET available_copies = available_copies - 1 WHERE book_id = NEW.book_id;
+END;
+
+-- Trigger: restore available copies when a book is returned
+CREATE TRIGGER trg_after_return AFTER UPDATE OF return_date ON BorrowRecords
+WHEN NEW.return_date IS NOT NULL AND OLD.return_date IS NULL
+BEGIN
+  UPDATE Books SET available_copies = available_copies + 1 WHERE book_id = NEW.book_id;
+END;
+
+-- Trigger: enforce enterprise constraint - max 3 active loans per member
+CREATE TRIGGER trg_borrow_limit BEFORE INSERT ON BorrowRecords
+BEGIN
+  SELECT CASE WHEN (
+    (SELECT COUNT(*) FROM BorrowRecords WHERE member_id = NEW.member_id AND return_date IS NULL) >= 3
+  ) THEN RAISE(ABORT, 'Member already has 3 books issued. Return one before borrowing again.')
+  END;
+END;
+
+-- Trigger: prevent issuing a book with zero available copies
+CREATE TRIGGER trg_no_stock BEFORE INSERT ON BorrowRecords
+BEGIN
+  SELECT CASE WHEN (
+    (SELECT available_copies FROM Books WHERE book_id = NEW.book_id) < 1
+  ) THEN RAISE(ABORT, 'No copies available for this book.')
+  END;
+END;
+`;
+
+const SEED_SQL = `
+INSERT INTO Categories (category_name) VALUES ('Fiction'),('Science'),('History'),('Technology'),('Biography');
+INSERT INTO Authors (author_name, nationality) VALUES
+ ('R.K. Narayan','Indian'),('Yuval Noah Harari','Israeli'),('J.K. Rowling','British'),
+ ('Robert C. Martin','American'),('Walter Isaacson','American');
+INSERT INTO Books (title, isbn, author_id, category_id, publisher, total_copies, available_copies) VALUES
+ ('Malgudi Days','9780143039655',1,1,'Indian Thought Publications',4,4),
+ ('Sapiens','9780062316097',2,2,'Harper',3,3),
+ ('Harry Potter and the Sorcerer''s Stone','9780590353427',3,1,'Scholastic',5,5),
+ ('Clean Code','9780132350884',4,4,'Prentice Hall',2,2),
+ ('Steve Jobs','9781451648539',5,5,'Simon & Schuster',3,3);
+INSERT INTO Members (name, email, phone, address) VALUES
+ ('Member One','member1@example.com','',''),
+ ('krishnan kundan','kkundan@example.com','9876543211','Pune'),
+ ('tarunpreet singh','tarun@example.com','9876543212','Delhi');
+INSERT INTO Staff (name, role, email) VALUES
+ ('Librarian One','Head Librarian','librarian1@example.com'),
+ ('Librarian Two','Assistant Librarian','librarian2@example.com');
+INSERT INTO BorrowRecords (book_id, member_id, staff_id, issue_date, due_date) VALUES
+ (1,1,1, date('now','-5 day'), date('now','+9 day')),
+ (3,2,1, date('now','-10 day'), date('now','-3 day')),
+ (4,3,2, date('now','-2 day'), date('now','+12 day'));
+`;
+
+async function initDb(){
+  const SQL = await initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}` });
+  db = new SQL.Database();
+  db.run(SCHEMA_SQL);
+  db.run(SEED_SQL);
+  $('dbStatus').textContent = 'MITWPU library \u2713';
+  refreshAll();
+}
+
+function q(sql, params=[]){
+  const res = db.exec(sql, params);
+  if(res.length===0) return {columns:[], values:[]};
+  return res[0];
+}
+
+function run(sql, params=[]){
+  db.run(sql, params);
+}
+
+function renderTable(tableEl, columns, values, opts={}){
+  if(columns.length===0){
+    tableEl.innerHTML = `<tr><td style="padding:14px;color:#8a8371;">No rows.</td></tr>`;
+    return;
+  }
+  let thead = '<thead><tr>' + columns.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('') + '</tr></thead>';
+  let rows = values.map(row=>{
+    return '<tr>' + row.map((cell,i)=>`<td>${fmtCell(columns[i],cell)}</td>`).join('') + '</tr>';
+  }).join('');
+  tableEl.innerHTML = thead + '<tbody>' + rows + '</tbody>';
+}
+
+function fmtCell(col, val){
+  if(val===null) return '<span style="color:#b3ab97;">&mdash;</span>';
+  if(col === 'fine_amount') return '₹' + Number(val).toFixed(2);
+  return val;
+}
+
+function refreshAll(){
+  refreshDashboard();
+  refreshCatalog();
+  refreshMembers();
+  refreshIssueForm();
+}
+
+function refreshDashboard(){
+  const totalBooks = q('SELECT COUNT(*) FROM Books').values[0][0];
+  const totalMembers = q('SELECT COUNT(*) FROM Members').values[0][0];
+  const activeLoans = q('SELECT COUNT(*) FROM BorrowRecords WHERE return_date IS NULL').values[0][0];
+  const overdue = q(`SELECT COUNT(*) FROM BorrowRecords WHERE return_date IS NULL AND due_date < date('now')`).values[0][0];
+
+  $('statGrid').innerHTML = [
+    ['Total Titles', totalBooks],
+    ['Registered Members', totalMembers],
+    ['Active Loans', activeLoans],
+    ['Overdue', overdue],
+  ].map(([label,num])=>`<div class="stat"><div class="num">${num}</div><div class="label">${label}</div></div>`).join('');
+
+  const {columns, values} = q(`
+    SELECT m.name AS member, b.title AS book, br.issue_date, br.due_date,
+      CASE WHEN br.due_date < date('now') THEN 'OVERDUE' ELSE 'ON TIME' END AS status
+    FROM BorrowRecords br
+    JOIN Members m ON br.member_id = m.member_id
+    JOIN Books b ON br.book_id = b.book_id
+    WHERE br.return_date IS NULL
+    ORDER BY br.due_date;
+  `);
+  renderTable($('dashIssuedTable'), columns, values);
+}
+
+function refreshCatalog(){
+  const cats = q('SELECT category_id, category_name FROM Categories ORDER BY category_name');
+  const sel = $('catalogCategory');
+  sel.innerHTML = '<option value="">All</option>' + cats.values.map(v=>`<option value="${v[0]}">${v[1]}</option>`).join('');
+  renderCatalogTable();
+}
+
+function renderCatalogTable(){
+  const search = $('catalogSearch').value.trim();
+  const cat = $('catalogCategory').value;
+  let sql = `
+    SELECT b.title, a.author_name AS author, c.category_name AS category,
+           b.publisher, b.available_copies AS available, b.total_copies AS total
+    FROM Books b
+    JOIN Authors a ON b.author_id = a.author_id
+    JOIN Categories c ON b.category_id = c.category_id
+    WHERE 1=1`;
+  const params = [];
+  if(search){ sql += ` AND (b.title LIKE ? OR a.author_name LIKE ?)`; params.push('%'+search+'%','%'+search+'%'); }
+  if(cat){ sql += ` AND b.category_id = ?`; params.push(cat); }
+  sql += ' ORDER BY b.title;';
+  const {columns, values} = q(sql, params);
+  renderTable($('catalogTable'), columns, values);
+}
+$('catalogSearch').addEventListener('input', renderCatalogTable);
+$('catalogCategory').addEventListener('change', renderCatalogTable);
+
+function addBook(){
+  const title = $('newTitle').value.trim();
+  const isbn = $('newIsbn').value.trim();
+  const authorName = $('newAuthor').value.trim();
+  const catName = $('newCategory').value.trim();
+  const publisher = $('newPublisher').value.trim();
+  const copies = parseInt($('newCopies').value) || 1;
+  const msg = $('addBookMsg');
+  if(!title || !authorName || !catName){ msg.innerHTML = `<div class="msg err">Title, author and category are required.</div>`; return; }
+  try{
+    let a = q('SELECT author_id FROM Authors WHERE author_name = ?', [authorName]);
+    let authorId = a.values.length ? a.values[0][0] : (run('INSERT INTO Authors (author_name) VALUES (?)',[authorName]), q('SELECT last_insert_rowid()').values[0][0]);
+    let c = q('SELECT category_id FROM Categories WHERE category_name = ?', [catName]);
+    let categoryId = c.values.length ? c.values[0][0] : (run('INSERT INTO Categories (category_name) VALUES (?)',[catName]), q('SELECT last_insert_rowid()').values[0][0]);
+    run('INSERT INTO Books (title, isbn, author_id, category_id, publisher, total_copies, available_copies) VALUES (?,?,?,?,?,?,?)',
+      [title, isbn||null, authorId, categoryId, publisher||null, copies, copies]);
+    msg.innerHTML = `<div class="msg ok">"${title}" added to the catalog.</div>`;
+    ['newTitle','newIsbn','newAuthor','newCategory','newPublisher'].forEach(id=>$(id).value='');
+    $('newCopies').value = 1;
+    refreshCatalog(); refreshIssueForm(); refreshDashboard();
+  }catch(e){ msg.innerHTML = `<div class="msg err">${e.message}</div>`; }
+}
+
+function refreshMembers(){
+  const {columns, values} = q(`
+    SELECT m.name, m.email, m.phone, m.membership_date,
+      (SELECT COUNT(*) FROM BorrowRecords br WHERE br.member_id=m.member_id AND br.return_date IS NULL) AS active_loans,
+      COALESCE((SELECT SUM(fine_amount) FROM BorrowRecords br WHERE br.member_id=m.member_id), 0) AS fine_amount
+    FROM Members m ORDER BY m.name;
+  `);
+  renderTable($('membersTable'), columns, values);
+}
+
+function addMember(){
+  const name = $('mName').value.trim();
+  const email = $('mEmail').value.trim();
+  const phone = $('mPhone').value.trim();
+  const address = $('mAddress').value.trim();
+  const msg = $('addMemberMsg');
+  if(!name || !email){ msg.innerHTML = `<div class="msg err">Name and email are required.</div>`; return; }
+  try{
+    run('INSERT INTO Members (name, email, phone, address) VALUES (?,?,?,?)', [name, email, phone||null, address||null]);
+    msg.innerHTML = `<div class="msg ok">${name} registered as a member.</div>`;
+    ['mName','mEmail','mPhone','mAddress'].forEach(id=>$(id).value='');
+    refreshMembers(); refreshIssueForm(); refreshDashboard();
+  }catch(e){ msg.innerHTML = `<div class="msg err">${e.message.includes('UNIQUE') ? 'That email is already registered.' : e.message}</div>`; }
+}
+
+function refreshIssueForm(){
+  const books = q(`SELECT book_id, title, available_copies FROM Books WHERE available_copies > 0 ORDER BY title`);
+  $('issueBook').innerHTML = books.values.map(v=>`<option value="${v[0]}">${v[1]} (${v[2]} left)</option>`).join('') || '<option>No copies available</option>';
+  const members = q(`SELECT member_id, name FROM Members ORDER BY name`);
+  $('issueMember').innerHTML = members.values.map(v=>`<option value="${v[0]}">${v[1]}</option>`).join('');
+  refreshActiveLoans();
+}
+
+function issueBook(){
+  const bookId = $('issueBook').value;
+  const memberId = $('issueMember').value;
+  const days = parseInt($('issueDays').value) || 14;
+  const msg = $('issueMsg');
+  try{
+    run(`INSERT INTO BorrowRecords (book_id, member_id, staff_id, issue_date, due_date)
+         VALUES (?, ?, 1, date('now'), date('now', '+' || ? || ' day'))`, [bookId, memberId, days]);
+    msg.innerHTML = `<div class="msg ok">Book issued successfully. Trigger auto-updated available copies.</div>`;
+    refreshAll();
+  }catch(e){ msg.innerHTML = `<div class="msg err">${e.message.replace('Error: ','')}</div>`; }
+}
+
+function refreshActiveLoans(){
+  const {columns, values} = q(`
+    SELECT br.record_id, m.name AS member, b.title AS book, br.due_date,
+      CASE WHEN br.due_date < date('now') THEN 'OVERDUE' ELSE 'ON TIME' END AS status
+    FROM BorrowRecords br
+    JOIN Members m ON br.member_id = m.member_id
+    JOIN Books b ON br.book_id = b.book_id
+    WHERE br.return_date IS NULL
+    ORDER BY br.due_date;
+  `);
+  if(columns.length===0){ $('activeLoansTable').innerHTML = '<tr><td style="padding:14px;color:#8a8371;">No active loans.</td></tr>'; return; }
+  let thead = '<thead><tr>' + columns.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('') + '<th>Action</th></tr></thead>';
+  let rows = values.map(row=>{
+    const recordId = row[0];
+    return '<tr>' + row.map((cell,i)=>`<td>${fmtCell(columns[i],cell)}</td>`).join('') +
+      `<td><button class="btn secondary" style="padding:5px 10px;font-size:0.82rem;" onclick="returnBook(${recordId})">Return</button></td></tr>`;
+  }).join('');
+  $('activeLoansTable').innerHTML = thead + '<tbody>' + rows + '</tbody>';
+}
+
+function returnBook(recordId){
+  run(`
+    UPDATE BorrowRecords
+    SET return_date = date('now'),
+        fine_amount = CASE WHEN date('now') > due_date
+                           THEN (julianday(date('now')) - julianday(due_date)) * 5.0
+                           ELSE 0 END
+    WHERE record_id = ?;
+  `, [recordId]);
+  refreshAll();
+}
+
+const REPORTS = {
+  overdue: {
+    label: 'Overdue Books',
+    sql: `SELECT m.name, m.email, b.title, br.due_date,
+            CAST(julianday('now') - julianday(br.due_date) AS INTEGER) AS days_overdue
+          FROM BorrowRecords br
+          JOIN Members m ON br.member_id = m.member_id
+          JOIN Books b ON br.book_id = b.book_id
+          WHERE br.return_date IS NULL AND br.due_date < date('now');`
+  },
+  popular: {
+    label: 'Most Borrowed Books',
+    sql: `SELECT b.title, COUNT(*) AS times_borrowed
+          FROM BorrowRecords br JOIN Books b ON br.book_id = b.book_id
+          GROUP BY b.title ORDER BY times_borrowed DESC;`
+  },
+  fines: {
+    label: 'Outstanding Fines',
+    sql: `SELECT m.name, SUM(br.fine_amount) AS fine_amount
+          FROM BorrowRecords br JOIN Members m ON br.member_id = m.member_id
+          GROUP BY m.name HAVING SUM(br.fine_amount) > 0;`
+  },
+  neverborrowed: {
+    label: 'Books Never Borrowed',
+    sql: `SELECT title FROM Books
+          WHERE book_id NOT IN (SELECT DISTINCT book_id FROM BorrowRecords);`
+  },
+  activeperauthor: {
+    label: 'Active Loans by Author',
+    sql: `SELECT a.author_name, COUNT(*) AS active_loans
+          FROM BorrowRecords br
+          JOIN Books b ON br.book_id = b.book_id
+          JOIN Authors a ON b.author_id = a.author_id
+          WHERE br.return_date IS NULL
+          GROUP BY a.author_name;`
+  }
+};
+
+function runReport(key){
+  const r = REPORTS[key];
+  $('reportSql').style.display = 'block';
+  $('reportSql').textContent = r.sql.trim();
+  const {columns, values} = q(r.sql);
+  renderTable($('reportTable'), columns, values);
+}
+
+function runConsole(){
+  const sql = $('sqlInput').value;
+  const msg = $('consoleMsg');
+  try{
+    const isSelect = /^\s*(select|explain)/i.test(sql);
+    if(isSelect){
+      const {columns, values} = q(sql);
+      renderTable($('consoleTable'), columns, values);
+      msg.innerHTML = `<div class="msg ok">${values.length} row(s) returned.</div>`;
+    } else {
+      run(sql);
+      $('consoleTable').innerHTML = '';
+      msg.innerHTML = `<div class="msg ok">Statement executed successfully.</div>`;
+      refreshAll();
+    }
+  }catch(e){
+    msg.innerHTML = `<div class="msg err">${e.message}</div>`;
+  }
+}
+
+// Tab switching
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    $('panel-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+initDb();
+</script>
+</body>
+</html>
