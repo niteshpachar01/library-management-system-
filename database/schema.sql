@@ -191,7 +191,7 @@ INSERT INTO Books (title, isbn, author_id, category_id, publisher, total_copies,
 INSERT INTO Members (name, email, phone, address) VALUES
 ('Member One', 'member1@example.com', '', ''),
 ('Member Two', 'member2@example.com', '', ''),
-('tarunpreet', 'tarun@example.com', '9876543212', 'Delhi');
+('Member Three', 'tarun@example.com', '', 'Delhi');
 
 INSERT INTO Staff (name, role, email) VALUES
 ('Librarian One', 'Head Librarian', 'librarian1@example.com'),
