@@ -92,8 +92,8 @@ INSERT INTO Members (name, email, phone, address) VALUES
  ('Member Two','member2@example.com','',''),
  ('Member Three','member3@example.com','','');
 INSERT INTO Staff (name, role, email) VALUES
- ('Ms. anuradha','Head Librarian','anjali@library.com'),
- ('Ms. anushree ','Assistant Librarian','rahul@library.com');
+ ('Librarian One','Head Librarian','librarian1@example.com'),
+ ('Librarian Two ','Assistant Librarian','librarian2@example.com');
 INSERT INTO BorrowRecords (book_id, member_id, staff_id, issue_date, due_date) VALUES
  (1,1,1, date('now','-5 day'), date('now','+9 day')),
  (3,2,1, date('now','-10 day'), date('now','-3 day')),
